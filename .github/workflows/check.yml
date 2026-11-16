@@ -1,21 +1,47 @@
-name: Check plugin
-on: [push, pull_request, workflow_dispatch]
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  FLUTTER_VERSION: 3.50.0
+
 jobs:
   android:
-    runs-on: ubuntu-latest
+    name: Test Android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.50.0'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
           cache: true
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test --no-pub --reporter expanded
+
       - name: Compile Android plugin
         run: |
           flutter create --platforms=android --project-name=location_probe "$RUNNER_TEMP/location_probe"
@@ -23,17 +49,25 @@ jobs:
           flutter pub add wear_location --path "$GITHUB_WORKSPACE"
           cd android
           ./gradlew :wear_location:compileReleaseKotlin --console=plain
+
   ios:
+    name: Check iOS
     runs-on: macos-15
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.50.0'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
           cache: true
-      - run: flutter precache --ios
+
+      - name: Prepare iOS SDK artifacts
+        run: flutter precache --ios
+
       - name: Check Swift bridge against iOS and Flutter
         run: |
           xcrun swiftc -typecheck -target arm64-apple-ios13.0 \
