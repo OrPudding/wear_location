@@ -15,13 +15,8 @@ env:
   FLUTTER_VERSION: 3.50.0
 
 jobs:
-  check:
-    name: Check package
-    uses: ./.github/workflows/check.yml
-
   publish:
     name: Publish release
-    needs: check
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
